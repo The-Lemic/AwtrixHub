@@ -1,0 +1,15 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "MQTT:BrokerUrl": "<your-mqtt-broker-url>",
+    "MQTT:Port": "8883",
+    "MQTT:Username": "<your-username>",
+    "MQTT:Password": "<your-password>",
+    "MQTT:UseTls": "true",
+    "MQTT:TopicPrefix": "<your-awtrix-topic-prefix>",
+    "BinCollection:UPRN": "<your-uprn>",
+    "BinCollection:ApiUrl": "https://bincollections.bromsgrove.gov.uk/BinCollections/Details"
+  }
+}

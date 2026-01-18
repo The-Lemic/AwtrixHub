@@ -76,15 +76,27 @@ namespace AwtrixHub.Functions.Functions
                 // If bin colleciton date is within 2 days
                 if (binDetails.Date - now.Date >= TimeSpan.FromDays(1))
                 {
-                    // Return Notification
-                    return new IndicatorDTO()
+                    switch (binDetails.Colour)
                     {
-                        IndicatorNumber = 2,
-                        Color = [0, 100, 0],
-                        Blink = 550
-                    };
+                        case Colour.Green:
+                            return new IndicatorDTO()
+                            {
+                                IndicatorNumber = 2,
+                                Color = [0, 100, 0],
+                                Blink = 550
+                            };
+                        case Colour.Black:
+                        default:
+                            return new IndicatorDTO()
+                            {
+                                IndicatorNumber = 2,
+                                Color = [100, 100, 100],
+                                Blink = 550
+                            };
+                    }
                 }
-                else if (binDetails.Date - now.Date == TimeSpan.FromDays(-1)) {
+                else if (binDetails.Date - now.Date == TimeSpan.FromDays(-1))
+                {
                     // Return Clear Notification
                     return new IndicatorDTO()
                     {

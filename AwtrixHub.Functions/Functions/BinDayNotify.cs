@@ -37,7 +37,7 @@ namespace AwtrixHub.Functions.Functions
         }
 
         [Function("BinDayNotify")]
-        public async Task Run([TimerTrigger("0 25 22 * * *")] TimerInfo myTimer)
+        public async Task Run([TimerTrigger("0 0 2 * * *")] TimerInfo myTimer)
         {
             // Log that the function has started
             _logger.LogInformation("C# Timer trigger function executed at: {Time}", DateTime.Now);

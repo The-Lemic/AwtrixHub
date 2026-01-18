@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using AwtrixHub.Functions.Functions;
 using AwtrixHub.Functions.Services;
 using Microsoft.Extensions.Logging;
+using AwtrixHub.Functions.Enums;
+using AwtrixHub.Functions.DTOs;
 
 
 namespace AwtrixHub.Functions.Tests
@@ -38,7 +40,15 @@ namespace AwtrixHub.Functions.Tests
         [Test]
         public async Task CreateMessage_GreenBinCollectionIsTwoDaysAgo_ReturnsNull()
         {
+            // Arrange
+            BinDetails binDetails = new(new DateTime(2026, 1, 22), Colour.Green);
+            DateTime now = new(2026, 1, 24, 2, 0, 0);
 
+            // Act
+            IndicatorDTO result = BinDayNotify.CreateMessage(binDetails, now);
+
+            // Assert
+            Assert.That(result, Is.Null);
         }
 
         [Test]
@@ -46,27 +56,51 @@ namespace AwtrixHub.Functions.Tests
         {
             // Arrange
             BinDetails binDetails = new(new DateTime(2026, 1, 22), Colour.Green);
-
-            DateTime now = new(2026, 1, 21, 12, 0, 0);
-
-            // Act
-            var result = BinDayNotify.CreateMessage(binDetails, now);
-
+            DateTime now = new(2026, 1, 21, 2, 0, 0);
 
             // Act
+            IndicatorDTO result = BinDayNotify.CreateMessage(binDetails, now);
+
+            // Assert
+            using (Assert.EnterMultipleScope())
+            {
+                // Need to do something here with the colour
+                Assert.That(result.Color, Is.EqualTo([0, 100, 0]));
+                Assert.That(result, Is.Not.Null);
+            }
         }
 
+        [Test]
         public async Task CreateMessage_GreenBinCollectionIsToday_ReturnsNull()
         {
             // Arrange
             BinDetails binDetails = new(new DateTime(2026, 1, 22), Colour.Green);
+            DateTime now = new(2026, 1, 22, 2, 0, 0);
 
-            DateTime now = new(2026, 1, 21, 12, 0, 0);
+            // Act
+            IndicatorDTO result = BinDayNotify.CreateMessage(binDetails, now);
+
+            // Assert
+            Assert.That(result, Is.Null);
         }
 
-        public async Task CreateMessage_GreenBinCollectionWasYesterday_ReturnsNull()
+        [Test]
+        public async Task CreateMessage_GreenBinCollectionWasYesterday_ClearsNotification()
         {
+            // Arrange
+            BinDetails binDetails = new(new DateTime(2026, 1, 22), Colour.Green);
+            DateTime now = new(2026, 1, 23, 2, 0, 0);
 
+            // Act
+            IndicatorDTO result = BinDayNotify.CreateMessage(binDetails, now);
+
+            // Assert
+            using (Assert.EnterMultipleScope())
+            {
+                // Need to do something here with the colour
+                Assert.That(result.Color, Is.EqualTo([0, 0, 0]));
+                Assert.That(result, Is.Not.Null);
+            }
         }
     }
 }

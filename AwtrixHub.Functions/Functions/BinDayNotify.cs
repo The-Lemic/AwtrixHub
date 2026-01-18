@@ -1,3 +1,5 @@
+using AwtrixHub.Functions.DTOs;
+using AwtrixHub.Functions.Enums;
 using AwtrixHub.Functions.Services;
 using HtmlAgilityPack;
 using Microsoft.Azure.Functions.Worker;
@@ -60,7 +62,7 @@ namespace AwtrixHub.Functions.Functions
         /// This is the actual buissness logic for if we would like to send a notification
         /// </summary>
         /// <param name="binDetails"></param>
-        public static object CreateMessage(BinDetails binDetails, DateTime now)
+        public static IndicatorDTO CreateMessage(BinDetails binDetails, DateTime now)
         {
             // if bin day is today
             if (binDetails != null)
@@ -70,13 +72,21 @@ namespace AwtrixHub.Functions.Functions
                 if (binDetails.Date - now.Date >= TimeSpan.FromDays(1))
                 {
                     // Return Notification
-                    return new
+                    return new IndicatorDTO()
                     {
-                        color = new int[0, 100, 0],
-                        blink = 500
+                        IndicatorNumber = 2,
+                        Color = [0, 100, 0],
+                        Blink = 550
                     };
                 }
-                // Clear notification if it was yesterday
+                else if (binDetails.Date - now.Date == TimeSpan.FromDays(-1)) {
+                    // Return Clear Notification
+                    return new IndicatorDTO()
+                    {
+                        IndicatorNumber = 2,
+                        Color = [0, 0, 0]
+                    };
+                }
             }
 
             return null;
@@ -141,46 +151,6 @@ namespace AwtrixHub.Functions.Functions
             {
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
-            }
-        }
-    }
-
-    public class BinDetails
-    {
-        public DateTime Date { get; set; }
-        public Colour Colour { get; set; }
-        public BinDetails(DateTime date, Colour colour)
-        {
-            Date = date;
-            Colour = colour;
-        }
-    }
-
-    public enum Colour
-    {
-        Black,
-        Green
-    }
-
-    public class IndicatorDTO
-    {
-        int IndicatorNumber { get; set; }
-
-        int[] RGB { get; set; }
-        int Blink { get; set; }
-
-        public IndicatorDTO() { }
-
-        public string GetEndpoint()
-        {
-            switch (IndicatorNumber)
-            {
-                case 1:
-                case 2:
-                case 3:
-                    return $"indicator{IndicatorNumber}";
-                default:
-                    throw new Exception("Indicator Number Not Valid");
             }
         }
     }

@@ -15,6 +15,7 @@ namespace AwtrixHub.Functions
                 {
                     services.AddApplicationInsightsTelemetryWorkerService();
                     services.ConfigureFunctionsApplicationInsights();
+                    services.AddHttpClient();
                     services.AddSingleton<IMqttService, MqttService>();
                 })
                 .Build();

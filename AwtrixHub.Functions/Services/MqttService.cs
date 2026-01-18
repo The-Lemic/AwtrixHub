@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace AwtrixHub.Functions.Services
 {
-    internal class MqttService : IMqttService
+    public class MqttService : IMqttService
     {
         private string _brokerURL;
         private int _port;

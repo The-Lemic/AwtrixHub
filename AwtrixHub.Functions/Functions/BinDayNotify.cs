@@ -3,13 +3,14 @@ using HtmlAgilityPack;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace AwtrixHub
+namespace AwtrixHub.Functions.Functions
 {
     public class BinDayNotify
     {
@@ -70,16 +71,36 @@ namespace AwtrixHub
             return ParseHtml(htmlResponse);
         }
 
-        private BinDetails ParseHtml(string htmlResponse)
+        public BinDetails ParseHtml(string htmlResponse)
         {
 
             var htmlDoc = new HtmlDocument();
             htmlDoc.LoadHtml(htmlResponse);
 
-            htmlDoc.DocumentNode.SelectNodes("");
+            DateTime nextCollectionDate = ExtractNextBinCollectionDate(htmlDoc);
+            Colour colour = GetBinColour(htmlDoc);
 
+            return new BinDetails(nextCollectionDate, colour);
+        }
 
-            return new BinDetails(DateTime.Now,Colour.Black);
+        private static DateTime ExtractNextBinCollectionDate(HtmlDocument htmlDoc)
+        {
+            var binCollectionDateString = htmlDoc.DocumentNode.SelectNodes("//p[@class='caption']")[0].InnerText.Trim("Next collection");
+            DateTime nextCollectionDate = DateTime.Parse(binCollectionDateString);
+            return nextCollectionDate;
+        }
+
+        private static Colour GetBinColour(HtmlDocument htmlDoc)
+        {
+            htmlDoc.DocumentNode.SelectNodes("//div[@class='heading']");
+            var binColourElement = htmlDoc.DocumentNode.SelectNodes("//div[@class='heading']").First().InnerText.Trim();
+
+            Colour colour;
+            if (binColourElement == "Green Bin")
+                colour = Colour.Green;
+            else
+                colour = Colour.Black;
+            return colour;
         }
 
         private static async Task<string> GetBinData()
@@ -106,10 +127,10 @@ namespace AwtrixHub
         }
     }
 
-    internal class BinDetails
+    public class BinDetails
     {
-        DateTime Date { get; set; }
-        Colour Colour { get; set; }
+        public DateTime Date { get; set; }
+        public Colour Colour { get; set; }
         internal BinDetails(DateTime date, Colour colour)
         {
             Date = date;
@@ -117,7 +138,7 @@ namespace AwtrixHub
         }
     }
 
-    enum Colour
+    public enum Colour
     {
         Black,
         Green

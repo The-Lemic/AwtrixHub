@@ -1,3 +1,8 @@
 <Solution>
-  <Project Path="AwtrixHub.Functions/AwtrixHub.Functions.csproj" />
+  <Folder Name="/src/">
+    <Project Path="AwtrixHub.Functions/AwtrixHub.Functions.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="AwtrixHub.Functions.Tests/AwtrixHub.Functions.Tests.csproj" Id="d331aa09-5338-472e-9603-9f8c65deeb2e" />
+  </Folder>
 </Solution>

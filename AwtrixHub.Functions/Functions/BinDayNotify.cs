@@ -44,29 +44,47 @@ namespace AwtrixHub.Functions.Functions
 
             // Check the council website to get the next bin day and the color
 
-            var Details = await GetNextBinDetails();
+            var binDetails = await GetNextBinDetails();
 
-            // if bin day is today
-
+            var message = CreateMessage(binDetails, DateTime.Now);
             // Send Bin Day Notification
 
-            // Create the message to send
-            var test = new
+            if (message != null)
             {
-                text = "Suck my fat one! 8===D",
-                rainbow = true,
-                duration = 10
-            };
+                // Call publish message with topic and message
+                await mqttService.PublishAsync("indicator2", JsonSerializer.Serialize(message));
+            }
+        }
 
+        /// <summary>
+        /// This is the actual buissness logic for if we would like to send a notification
+        /// </summary>
+        /// <param name="binDetails"></param>
+        public static object CreateMessage(BinDetails binDetails, DateTime now)
+        {
+            // if bin day is today
+            if (binDetails != null)
+            {
 
+                // If bin colleciton date is within 2 days
+                if (binDetails.Date - now.Date >= TimeSpan.FromDays(1))
+                {
+                    // Return Notification
+                    return new
+                    {
+                        color = new int[0, 100, 0],
+                        blink = 500
+                    };
+                }
+                // Clear notification if it was yesterday
+            }
 
-            // Call publish message with topic and message
-            await mqttService.PublishAsync("notify", JsonSerializer.Serialize(test));
+            return null;
         }
 
         private async Task<BinDetails> GetNextBinDetails()
         {
-            var htmlResponse = await GetBinData();
+            var htmlResponse = await GetBinCollectionDetailsHTML();
 
             return ParseHtml(htmlResponse);
         }
@@ -103,7 +121,7 @@ namespace AwtrixHub.Functions.Functions
             return colour;
         }
 
-        private static async Task<string> GetBinData()
+        private static async Task<string> GetBinCollectionDetailsHTML()
         {
             var client = new HttpClient();
             var request = new HttpRequestMessage
@@ -131,7 +149,7 @@ namespace AwtrixHub.Functions.Functions
     {
         public DateTime Date { get; set; }
         public Colour Colour { get; set; }
-        internal BinDetails(DateTime date, Colour colour)
+        public BinDetails(DateTime date, Colour colour)
         {
             Date = date;
             Colour = colour;
@@ -142,5 +160,28 @@ namespace AwtrixHub.Functions.Functions
     {
         Black,
         Green
+    }
+
+    public class IndicatorDTO
+    {
+        int IndicatorNumber { get; set; }
+
+        int[] RGB { get; set; }
+        int Blink { get; set; }
+
+        public IndicatorDTO() { }
+
+        public string GetEndpoint()
+        {
+            switch (IndicatorNumber)
+            {
+                case 1:
+                case 2:
+                case 3:
+                    return $"indicator{IndicatorNumber}";
+                default:
+                    throw new Exception("Indicator Number Not Valid");
+            }
+        }
     }
 }

@@ -34,5 +34,39 @@ namespace AwtrixHub.Functions.Tests
                 Assert.That(result.Date, Is.EqualTo(new DateTime(2026, 1, 22)));
             }
         }
+
+        [Test]
+        public async Task CreateMessage_GreenBinCollectionIsTwoDaysAgo_ReturnsNull()
+        {
+
+        }
+
+        [Test]
+        public async Task CreateMessage_GreenBinCollectionIsTomorrow_GreenBinNotificationCreated()
+        {
+            // Arrange
+            BinDetails binDetails = new(new DateTime(2026, 1, 22), Colour.Green);
+
+            DateTime now = new(2026, 1, 21, 12, 0, 0);
+
+            // Act
+            var result = BinDayNotify.CreateMessage(binDetails, now);
+
+
+            // Act
+        }
+
+        public async Task CreateMessage_GreenBinCollectionIsToday_ReturnsNull()
+        {
+            // Arrange
+            BinDetails binDetails = new(new DateTime(2026, 1, 22), Colour.Green);
+
+            DateTime now = new(2026, 1, 21, 12, 0, 0);
+        }
+
+        public async Task CreateMessage_GreenBinCollectionWasYesterday_ReturnsNull()
+        {
+
+        }
     }
 }

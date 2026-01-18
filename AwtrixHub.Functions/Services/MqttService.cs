@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using MQTTnet;
 using System;
 using System.Threading;
@@ -8,65 +9,82 @@ namespace AwtrixHub.Functions.Services
 {
     public class MqttService : IMqttService
     {
-        private string _brokerURL;
-        private int _port;
-        private string _username;
-        private string _password;
-        private bool _useTls;
-        private string _topicPrefix;
+        private readonly string _brokerURL;
+        private readonly int _port;
+        private readonly string _username;
+        private readonly string _password;
+        private readonly bool _useTls;
+        private readonly string _topicPrefix;
+        private readonly ILogger<MqttService> _logger;
 
-
-        // Constructor
-
-        public MqttService(IConfiguration configuration)
+        public MqttService(IConfiguration configuration, ILogger<MqttService> logger)
         {
-            _brokerURL = configuration["MQTT:BrokerUrl"];
-            _port = int.Parse(configuration["MQTT:Port"]);
-            _username = configuration["MQTT:Username"];
-            _password = configuration["MQTT:Password"];
+            _logger = logger;
+
+            _brokerURL = configuration["MQTT:BrokerUrl"]
+                ?? throw new InvalidOperationException("MQTT:BrokerUrl configuration is required");
+
+            var portString = configuration["MQTT:Port"]
+                ?? throw new InvalidOperationException("MQTT:Port configuration is required");
+            if (!int.TryParse(portString, out _port) || _port < 1 || _port > 65535)
+                throw new InvalidOperationException($"MQTT:Port must be a valid port number (1-65535), got: {portString}");
+
+            _username = configuration["MQTT:Username"] ?? string.Empty;
+            _password = configuration["MQTT:Password"] ?? string.Empty;
             _ = bool.TryParse(configuration["MQTT:UseTls"], out _useTls);
-            _topicPrefix = configuration["MQTT:TopicPrefix"];
+
+            _topicPrefix = configuration["MQTT:TopicPrefix"]
+                ?? throw new InvalidOperationException("MQTT:TopicPrefix configuration is required");
         }
 
         public async Task PublishAsync(string topic, string payload)
         {
-            var mqttFactory = new MqttClientFactory();
+            var fullTopic = $"{_topicPrefix}/{topic}";
+            _logger.LogDebug("Publishing to MQTT topic {Topic}", fullTopic);
 
+            var mqttFactory = new MqttClientFactory();
             using var mqttClient = mqttFactory.CreateMqttClient();
 
+            try
+            {
+                var mqttClientTlsOptions = new MqttClientTlsOptionsBuilder()
+                    .UseTls(_useTls)
+                    .Build();
 
-            var mqttClientTlsOptions = new MqttClientTlsOptionsBuilder()
-                .UseTls(_useTls)
-                .Build();
+                var mqttClientOptionsBuilder = new MqttClientOptionsBuilder()
+                    .WithTcpServer(_brokerURL, _port)
+                    .WithTlsOptions(mqttClientTlsOptions);
 
-            var mqttClientOptionsBuilder = new MqttClientOptionsBuilder()
-                .WithTcpServer(_brokerURL, _port)
-                .WithTlsOptions(mqttClientTlsOptions);
+                if (!string.IsNullOrEmpty(_username) && !string.IsNullOrEmpty(_password))
+                    mqttClientOptionsBuilder.WithCredentials(_username, _password);
 
-            if (!String.IsNullOrEmpty(_username) && !String.IsNullOrEmpty(_password))
-                mqttClientOptionsBuilder.WithCredentials(_username, _password);
+                var mqttClientOptions = mqttClientOptionsBuilder.Build();
 
-            var mqttClientOptions = mqttClientOptionsBuilder.Build();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var response = await mqttClient.ConnectAsync(mqttClientOptions, cts.Token);
 
-            // This will throw an exception if the server is not available.
-            // The result from this message returns additional data which was sent
-            // from the server. Please refer to the MQTT protocol specification for details.
-            var response = await mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
+                _logger.LogInformation("MQTT client connected to {Broker}:{Port}", _brokerURL, _port);
 
-            Console.WriteLine("The MQTT client is connected.");
+                var applicationMessage = new MqttApplicationMessageBuilder()
+                    .WithTopic(fullTopic)
+                    .WithPayload(payload)
+                    .Build();
 
-            Console.WriteLine(response);
+                await mqttClient.PublishAsync(applicationMessage, cts.Token);
+                _logger.LogInformation("MQTT message published to {Topic}", fullTopic);
 
-            var applicationMessage = new MqttApplicationMessageBuilder()
-            .WithTopic(_topicPrefix + "/" + topic)
-            .WithPayload(payload)
-            .Build();
-
-            await mqttClient.PublishAsync(applicationMessage, CancellationToken.None);
-
-            await mqttClient.DisconnectAsync();
-
-            Console.WriteLine("MQTT application message is published.");
+                await mqttClient.DisconnectAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogError("MQTT operation timed out connecting to {Broker}:{Port}", _brokerURL, _port);
+                throw new InvalidOperationException($"MQTT connection to {_brokerURL}:{_port} timed out after 30 seconds");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to publish MQTT message to {Topic}", fullTopic);
+                throw;
+            }
         }
     }
 }

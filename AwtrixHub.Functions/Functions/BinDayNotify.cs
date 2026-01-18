@@ -67,7 +67,6 @@ namespace AwtrixHub.Functions.Functions
             // if bin day is today
             if (binDetails != null)
             {
-
                 // If bin colleciton date is within 2 days
                 if (binDetails.Date - now.Date >= TimeSpan.FromDays(1))
                 {

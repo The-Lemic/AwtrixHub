@@ -3,27 +3,37 @@ using AwtrixHub.Functions.Enums;
 using AwtrixHub.Functions.Services;
 using HtmlAgilityPack;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AwtrixHub.Functions.Functions
 {
     public class BinDayNotify
     {
-        private readonly IMqttService mqttService;
-
+        private readonly IMqttService _mqttService;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger _logger;
+        private readonly string _uprn;
+        private readonly string _apiUrl;
 
-        public BinDayNotify(IMqttService mqttService, ILoggerFactory loggerFactory)
+        public BinDayNotify(
+            IMqttService mqttService,
+            IHttpClientFactory httpClientFactory,
+            ILoggerFactory loggerFactory,
+            IConfiguration configuration)
         {
             _logger = loggerFactory.CreateLogger<BinDayNotify>();
-            this.mqttService = mqttService;
+            _mqttService = mqttService;
+            _httpClientFactory = httpClientFactory;
+            _uprn = configuration["BinCollection:UPRN"]
+                ?? throw new InvalidOperationException("BinCollection:UPRN configuration is required");
+            _apiUrl = configuration["BinCollection:ApiUrl"]
+                ?? throw new InvalidOperationException("BinCollection:ApiUrl configuration is required");
         }
 
         [Function("BinDayNotify")]
@@ -42,19 +52,15 @@ namespace AwtrixHub.Functions.Functions
                 }
             }
 
-            // Step 1
-
             // Check the council website to get the next bin day and the color
-
             var binDetails = await GetNextBinDetails();
-
             var message = CreateMessage(binDetails, DateTime.Now);
+            
             // Send Bin Day Notification
-
             if (message != null)
             {
                 // Call publish message with topic and message
-                await mqttService.PublishAsync("indicator2", JsonSerializer.Serialize(message));
+                await _mqttService.PublishAsync("indicator2", JsonSerializer.Serialize(message));
             }
         }
 
@@ -112,32 +118,44 @@ namespace AwtrixHub.Functions.Functions
 
         private static DateTime ExtractNextBinCollectionDate(HtmlDocument htmlDoc)
         {
-            var binCollectionDateString = htmlDoc.DocumentNode.SelectNodes("//p[@class='caption']")[0].InnerText.Trim("Next collection");
-            DateTime nextCollectionDate = DateTime.Parse(binCollectionDateString);
+            var captionNodes = htmlDoc.DocumentNode.SelectNodes("//p[@class='caption']");
+            if (captionNodes == null || captionNodes.Count == 0)
+                throw new InvalidOperationException("Could not find bin collection date element in HTML response");
+
+            var binCollectionDateString = captionNodes[0].InnerText
+                .Replace("Next collection", "", StringComparison.OrdinalIgnoreCase)
+                .Trim();
+
+            if (!DateTime.TryParse(binCollectionDateString, out var nextCollectionDate))
+                throw new InvalidOperationException($"Could not parse bin collection date: '{binCollectionDateString}'");
+
             return nextCollectionDate;
         }
 
         private static Colour GetBinColour(HtmlDocument htmlDoc)
         {
-            htmlDoc.DocumentNode.SelectNodes("//div[@class='heading']");
-            var binColourElement = htmlDoc.DocumentNode.SelectNodes("//div[@class='heading']").First().InnerText.Trim();
+            var headingNodes = htmlDoc.DocumentNode.SelectNodes("//div[@class='heading']");
+            if (headingNodes == null || headingNodes.Count == 0)
+                throw new InvalidOperationException("Could not find bin colour element in HTML response");
 
-            Colour colour;
-            if (binColourElement == "Green Bin")
-                colour = Colour.Green;
-            else
-                colour = Colour.Black;
-            return colour;
+            var binColourElement = headingNodes[0].InnerText.Trim();
+
+            return binColourElement switch
+            {
+                "Green Bin" => Colour.Green,
+                "Grey Bin" => Colour.Black,
+                _ => Colour.Black
+            };
         }
 
-        private static async Task<string> GetBinCollectionDetailsHTML()
+        private async Task<string> GetBinCollectionDetailsHTML()
         {
-            var client = new HttpClient();
+            using var client = _httpClientFactory.CreateClient();
             var request = new HttpRequestMessage
             {
                 Method = HttpMethod.Post,
-                RequestUri = new Uri("https://bincollections.bromsgrove.gov.uk/BinCollections/Details"),
-                Content = new StringContent("{\"UPRN\": 10000214236}")
+                RequestUri = new Uri(_apiUrl),
+                Content = new StringContent($"{{\"UPRN\": {_uprn}}}")
                 {
                     Headers =
                     {
@@ -146,11 +164,9 @@ namespace AwtrixHub.Functions.Functions
                 }
             };
 
-            using (var response = await client.SendAsync(request))
-            {
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync();
-            }
+            using var response = await client.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
         }
     }
 }
